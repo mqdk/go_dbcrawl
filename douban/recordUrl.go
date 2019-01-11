@@ -18,15 +18,15 @@ type Record struct {
 
 /**
 crawl movie url
- */
+*/
 func parseRecord(url string) {
 	movieUrlSet := hashset.New()
 	c := colly.NewCollector()
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		url := e.Attr("href")
-		if !isEmpty(url) && strings.HasPrefix(url, MOVIE_MAINURL) {
+		if !isEmpty(url) && (strings.HasPrefix(url, MOVIE_URL) || strings.HasPrefix(url, MUSIC_URL)) {
 			//Logger.Infof("recordUrl: %s", url[:41])
-			movieUrlSet.Add(url[:41]) //!
+			movieUrlSet.Add(url[:41]) // just get useful url eg:https://music.douban.com/subject/30408564/
 		}
 	})
 
@@ -73,6 +73,6 @@ func insertRecords(movieUrlSet *hashset.Set) {
 	if err != nil {
 		tx.Rollback()
 		Logger.Errorf("batchInsert error: %s", err)
-		//Deadlock found when trying to get lock; try restarting transaction
+		//!!!Deadlock found when trying to get lock; try restarting transaction
 	}
 }

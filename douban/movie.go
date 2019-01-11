@@ -26,13 +26,13 @@ type Movie struct {
 	UpdatedAt time.Time
 }
 
-type Tag struct {
+type TagMovie struct {
 	ID        uint   `gorm:"primary_key"`
 	TagName   string `gorm:"type:varchar(32);not null"`
 	CreatedAt time.Time
 }
 
-type MovieTag struct {
+type TagMovieLink struct {
 	MovieID   uint `gorm:"type:varchar(16)"`
 	TagID     uint `gorm:"type:varchar(16)"`
 	CreatedAt time.Time
@@ -53,10 +53,10 @@ type MovieComment struct {
 
 /**
 crawl movie info
- */
+*/
 func parseMovie(url string) {
 	var tagIDS []uint
-	r := regexp.MustCompile(MOVIEID_REG_EXP)
+	r := regexp.MustCompile(DOUBANID_REG_EXP)
 	doubanId := r.FindString(url)
 	movie := &Movie{
 		DoubanID:  doubanId,
@@ -87,13 +87,13 @@ func parseMovie(url string) {
 
 		tagIDS = make([]uint, 0)
 		e.ForEach(`div[class="tags-body"] a`, func(i int, e *colly.HTMLElement) {
-			tag := &Tag{
+			tag := &TagMovie{
 				TagName:   e.Text,
 				CreatedAt: time.Now(),
 			}
 			tx := db.Begin()
 			//insert tag,unique
-			if err := tx.FirstOrCreate(tag, &Tag{TagName: e.Text}).Error; err != nil {
+			if err := tx.FirstOrCreate(tag, &TagMovie{TagName: e.Text}).Error; err != nil {
 				tx.Rollback()
 			}
 			tx.Commit()
@@ -175,7 +175,7 @@ func createMovie(movie *Movie, tagIDS []uint) uint {
 	movieTags := make([]interface{}, 0)
 	for _, v := range tagIDS {
 		//Logger.Infof("tagIDS:%d", v)
-		movieTag := &MovieTag{
+		movieTag := &TagMovieLink{
 			MovieID:   movieId,
 			TagID:     v,
 			CreatedAt: time.Now(),
@@ -191,7 +191,7 @@ func createMovie(movie *Movie, tagIDS []uint) uint {
 }
 
 func parseMovieComment(url string) {
-	r := regexp.MustCompile(MOVIEID_REG_EXP)
+	r := regexp.MustCompile(DOUBANID_REG_EXP)
 	doubanId := r.FindString(url)
 	comments := make([]interface{}, 0)
 
@@ -260,7 +260,6 @@ func parseMovieComment(url string) {
 			commentForbidden = true
 		}
 	} else {
-		//Logger.Infof("comments:%q", comments)
 		createComments(comments)
 	}
 }

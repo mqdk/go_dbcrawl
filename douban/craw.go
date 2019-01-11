@@ -10,20 +10,19 @@ import (
 )
 
 const (
-	MAINURL             = "https://movie.douban.com/"
-	ANNUALURL           = "https://movie.douban.com/annual/2018"
-	TOP250URL           = "https://movie.douban.com/top250?start=75&filter="
-	MOVIE_MAINURL       = "https://movie.douban.com/subject"
-	MOVIE_REGULAR_EXP   = "https://movie.douban.com/subject/\\d{8}|\\d{7}"
-	COMMENT_REGULAR_EXP = "https://movie.douban.com/subject/\\d{8}|\\d{7}/comments"
-	MOVIEID_REG_EXP     = "\\d{8}|\\d{7}"
-	COMMENT_END_REG_EXP = ".*\\/comments$"
-	MAXCOUNT            = 5
-	WORKERNUM           = 2
+	MOVIE_MAINURL = "https://movie.douban.com/"
+	MUSIC_MAINURL = "https://music.douban.com/"
+	MOVIE_URL     = "https://movie.douban.com/subject"
+	MUSIC_URL     = "https://music.douban.com/subject"
+	//MOVIE_REGULAR_EXP   = "https://movie.douban.com/subject/\\d{8}|\\d{7}"
+	//COMMENT_REGULAR_EXP = "https://movie.douban.com/subject/\\d{8}|\\d{7}/comments"
+	DOUBANID_REG_EXP = "\\d{8}|\\d{7}"
+	//COMMENT_END_REG_EXP = ".*\\/comments$"
+	MAXCOUNT  = 10
+	WORKERNUM = 2
 )
 
-var
-(
+var (
 	Logger           = golog.New()
 	db               *gorm.DB
 	recordForbidden  = false
@@ -38,10 +37,10 @@ func RunDoubanCrawl() {
 	//beginVisitWithMultiWorkers()
 }
 
-//sigle worker to do crawl
+//single worker to do crawl
 func beginVisit() {
 	urlList := make([]string, 0)
-	urlList = append(urlList, MAINURL)
+	urlList = append(urlList, MOVIE_MAINURL, MUSIC_MAINURL)
 	count := 0
 	for {
 		if recordForbidden && movieForbidden {
@@ -61,13 +60,18 @@ func beginVisit() {
 				db.Model(&Record{}).Where("url = ?", url).Update("crawled", 1)
 				parseRecord(url)
 
-				if strings.HasPrefix(url, MOVIE_MAINURL) {
+				if strings.HasPrefix(url, MOVIE_URL) {
 					url = url[:41]
 					parseMovie(url)
 				}
 
 				if strings.Contains(url, "comments") {
-					go parseMovieComment(url)
+					parseMovieComment(url)
+				}
+
+				if strings.HasPrefix(url, MUSIC_URL) {
+					url = url[:41]
+					parseMusic(url)
 				}
 
 				friendlyToDouban()
@@ -84,11 +88,11 @@ func beginVisit() {
 	}
 }
 
-//multi worker to do crawl!!!
+//multi worker to do crawl,unsafe,may block by douban website!!!
 func beginVisitWithMultiWorkers() {
 	urlChan := make(chan string, 10)
 	urlList := make([]string, 0)
-	urlList = append(urlList, MAINURL)
+	urlList = append(urlList, MOVIE_MAINURL)
 	var stopProduce bool
 
 	count := 0
@@ -147,7 +151,7 @@ func consume(ch <-chan string, worker string) {
 		Logger.Infof("%s consume:%s", worker, url)
 		parseRecord(url)
 
-		if strings.HasPrefix(url, MOVIE_MAINURL) {
+		if strings.HasPrefix(url, MOVIE_URL) {
 			url = url[:41]
 			parseMovie(url)
 		}
@@ -167,7 +171,8 @@ func initDB() {
 	}
 	//defer db.Close()
 
-	db.Set("gorm:table_options", "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4").AutoMigrate(&Record{}, &Movie{}, &MovieComment{}, &Tag{}, &MovieTag{})
+	db.Set("gorm:table_options", "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4").AutoMigrate(&Record{}, &Movie{}, &MovieComment{}, &TagMovie{}, &TagMovieLink{}, &Album{}, &TagAlbum{}, &TagAlbumLink{}, &Song{})
+	db.Model(&Album{}).Related(&[]Song{})
 }
 
 func initLog() {
