@@ -45,6 +45,19 @@ type Song struct {
 	CreatedAt time.Time
 }
 
+type MusicComment struct {
+	ID          uint   `gorm:"primary_key"`
+	DoubanID    string `gorm:"type:varchar(8);not null"`
+	Info        string `gorm:"type:varchar(355);unique;not null"`
+	Author      string `gorm:"type:varchar(50)"`
+	Avatar      string `gorm:"type:varchar(128)"`
+	VoteNum     string `gorm:"type:varchar(10);default:0"`
+	CommentDate string `gorm:"type:varchar(128)"`
+	Star        int    `gorm:"size:1;default:0"`
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
 func parseMusic(url string) {
 	var tagIDS []uint
 	r := regexp.MustCompile(DOUBANID_REG_EXP)
@@ -164,7 +177,12 @@ func parseMusic(url string) {
 			recordForbidden = true
 		}
 	} else {
-		createAlbum(album, tagIDS)
+		albumId := createAlbum(album, tagIDS)
+		if albumId > 0 { //insert success
+			url = url[:41]
+			url += "/comments"
+			parseMusicComments(url)
+		}
 	}
 }
 
@@ -193,4 +211,85 @@ func createAlbum(album *Album, tagIDS []uint) uint {
 	}
 	tx.Commit()
 	return albumId
+}
+
+func parseMusicComments(url string) {
+	r := regexp.MustCompile(DOUBANID_REG_EXP)
+	doubanId := r.FindString(url)
+	comments := make([]interface{}, 0)
+
+	c := colly.NewCollector()
+	c.OnRequest(func(r *colly.Request) {
+	})
+	c.OnResponse(func(r *colly.Response) {
+		Logger.Infof("music comment Visited: %s", r.Request.URL)
+	})
+
+	c.OnHTML("#comments", func(e *colly.HTMLElement) {
+		var star int
+		e.ForEach(`li[class="comment-item"]`, func(i int, e *colly.HTMLElement) {
+			comment := &MusicComment{
+				DoubanID:  doubanId,
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			}
+			img := e.ChildAttr("img", "src")
+			comment.Avatar = img
+			title := e.ChildAttr("a", "title")
+			comment.Author = title
+			vote := e.ChildText(`span[class="vote-count"]`)
+			comment.VoteNum = vote
+			info := e.ChildText(`span[class="short"]`)
+			comment.Info = info
+
+			date := e.ChildText(`div[class="comment"] span[class="comment-info"] span`)
+			comment.CommentDate = date
+
+			commentInfos := e.ChildAttrs(`div[class="comment"] span[class="comment-info"] span`, "title")
+			for _, v := range commentInfos {
+				if !isEmpty(v) {
+					switch v {
+					case "力荐":
+						star = 5
+						break
+					case "推荐":
+						star = 4
+						break
+					case "还行":
+						star = 3
+						break
+					case "较差":
+						star = 2
+						break
+					case "很差":
+						star = 1
+						break
+					default:
+						star = 0
+					}
+				}
+				comment.Star = star
+			}
+			comments = append(comments, comment)
+		})
+
+	})
+
+	if err := c.Visit(url); err != nil {
+		Logger.Errorf("music comment to Visit:%s error:%s", url, err)
+		if err.Error() == "Forbidden" {
+			commentForbidden = true
+		}
+	} else {
+		createMusicComments(comments)
+		//Logger.Debugf("%+q", comments)
+	}
+}
+
+func createMusicComments(comments []interface{}) {
+	tx := db.Begin()
+	if err := batchInsert(tx, comments); err != nil {
+		tx.Rollback()
+	}
+	tx.Commit()
 }

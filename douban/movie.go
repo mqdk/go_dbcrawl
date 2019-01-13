@@ -151,7 +151,7 @@ func parseMovie(url string) {
 			movieForbidden = true
 		}
 	} else {
-		//Logger.Debugf("%+v", movie)
+		//Logger.Debugf("%+v", *movie)
 		movieId := createMovie(movie, tagIDS)
 		if movieId > 0 { //insert success
 			url = url[:41]
@@ -200,7 +200,7 @@ func parseMovieComment(url string) {
 		//Logger.Infof("movie Visiting: %s", r.URL)
 	})
 	c.OnResponse(func(r *colly.Response) {
-		Logger.Infof("comment Visited: %s", r.Request.URL)
+		Logger.Infof("movie comment Visited: %s", r.Request.URL)
 	})
 
 	c.OnHTML("#comments", func(e *colly.HTMLElement) {
@@ -255,16 +255,16 @@ func parseMovieComment(url string) {
 	})
 
 	if err := c.Visit(url); err != nil {
-		Logger.Errorf("comment to Visit:%s error:%s", url, err)
+		Logger.Errorf("movie comment to Visit:%s error:%s", url, err)
 		if err.Error() == "Forbidden" {
 			commentForbidden = true
 		}
 	} else {
-		createComments(comments)
+		createMovieComments(comments)
 	}
 }
 
-func createComments(comments []interface{}) {
+func createMovieComments(comments []interface{}) {
 	tx := db.Begin()
 	if err := batchInsert(tx, comments); err != nil {
 		tx.Rollback()

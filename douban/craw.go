@@ -35,6 +35,7 @@ func RunDoubanCrawl() {
 	initDB()
 	beginVisit()
 	//beginVisitWithMultiWorkers()
+
 }
 
 //single worker to do crawl
@@ -63,10 +64,6 @@ func beginVisit() {
 				if strings.HasPrefix(url, MOVIE_URL) {
 					url = url[:41]
 					parseMovie(url)
-				}
-
-				if strings.Contains(url, "comments") {
-					parseMovieComment(url)
 				}
 
 				if strings.HasPrefix(url, MUSIC_URL) {
@@ -156,10 +153,6 @@ func consume(ch <-chan string, worker string) {
 			parseMovie(url)
 		}
 
-		if strings.Contains(url, "comments") {
-			parseMovieComment(url)
-		}
-
 		friendlyToDouban()
 	}
 }
@@ -171,7 +164,7 @@ func initDB() {
 	}
 	//defer db.Close()
 
-	db.Set("gorm:table_options", "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4").AutoMigrate(&Record{}, &Movie{}, &MovieComment{}, &TagMovie{}, &TagMovieLink{}, &Album{}, &TagAlbum{}, &TagAlbumLink{}, &Song{})
+	db.Set("gorm:table_options", "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4").AutoMigrate(&Record{}, &Movie{}, &MovieComment{}, &TagMovie{}, &TagMovieLink{}, &Album{}, &TagAlbum{}, &TagAlbumLink{}, &Song{}, &MusicComment{})
 	db.Model(&Album{}).Related(&[]Song{})
 }
 
